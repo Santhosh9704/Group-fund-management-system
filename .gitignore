@@ -1,7 +1,15 @@
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 database.db
 .env
 .DS_Store
 static/uploads/
+.pytest_cache/
+logs/
+*.log
+*.egg-info/
+dist/
+build/
