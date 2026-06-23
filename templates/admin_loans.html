@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loan Management - Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            background: #222;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <div class="logo">
+                <span>🛡️</span> Admin Panel
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary btn-sm">Logout</a>
+            </div>
+        </nav>
+
+        <header style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>Loan Management</h1>
+                <p style="color: var(--text-muted)">Manage loan creation, approvals, and interest payments.</p>
+            </div>
+            <a href="#create-loan" class="btn" onclick="showCreateLoanModal(); return false;">+ Create New Loan</a>
+        </header>
+
+        <!-- Stats Row -->
+        <div class="card-grid"
+            style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
+            <div class="card">
+                <div class="stat-card">
+                    <span class="stat-label">Pending Approvals</span>
+                    <span class="stat-value" style="color: #fbbf24;">{{ pending_count }}</span>
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat-card">
+                    <span class="stat-label">Active Loans Value</span>
+                    <span class="stat-value" style="color: #4ade80;">{{ total_active_principal | currency }}</span>
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat-card">
+                    <span class="stat-label">Interest This Month</span>
+                    <span class="stat-value" style="color: #60a5fa;">{{ interest_collected_month | currency }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Requests Section -->
+        {% if pending_loans %}
+        <div class="card" style="margin-bottom: 2rem; border-left: 4px solid #fbbf24;">
+            <div class="section-header">
+                <h3>⚠️ Pending Requests ({{ pending_loans|length }})</h3>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Member</th>
+                            <th>Amount</th>
+                            <th>Duration</th>
+                            <th>Monthly Interest</th>
+                            <th>Requested On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for loan in pending_loans %}
+                        <tr>
+                            <td style="font-weight: 500;">{{ loan.name }}</td>
+                            <td style="color: white; font-size: 1.1rem;">{{ loan.amount | currency }}</td>
+                            <td>{{ loan.total_months }} Months</td>
+                            <td>{{ loan.interest_per_month | currency }}</td>
+                            <td>{{ loan.request_time[:10] }}</td>
+                            <td>
+                                <div style="display: flex; gap: 0.5rem;">
+                                     <a href="{{ url_for('admin.approve_loan', loan_id=loan.loan_id) }}" class="btn btn-sm"
+                                         style="background: var(--success); text-decoration: none;">Approve</a>
+                                     <a href="{{ url_for('admin.reject_loan', loan_id=loan.loan_id) }}" class="btn btn-sm btn-danger"
+                                         style="text-decoration: none;">Reject</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Active Loans Section -->
+        <div class="card">
+            <div class="section-header">
+                <h3>Active Loans</h3>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Member</th>
+                            <th>Amount</th>
+                            <th>Payment Type</th>
+                            <th>Next Payment</th>
+                            <th>Remaining Bal</th>
+                            <th>Status</th>
+                            <th>Record Payment</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for loan in active_loans %}
+                        <tr>
+                            <td>
+                                <div style="font-weight: 500; color: #fff;">{{ loan.name }}</div>
+                            </td>
+                            <td>{{ loan.amount | currency }}</td>
+                            <td>
+                                {% if loan.payment_type == 'lump_sum' %}
+                                <span class="badge" style="background: #8b5cf6;">Full Cash</span>
+                                {% else %}
+                                <span class="badge" style="background: #3b82f6;">Monthly EMI</span>
+                                {% endif %}
+                            </td>
+                            <td style="color: #4ade80; font-weight: 600;">
+                                {{ loan.next_emi_amount | currency }}
+                                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: normal;">
+                                    {{ loan.payment_label }}
+                                </div>
+                            </td>
+                            <td style="color: #fbbf24;">{{ loan.remaining_balance | currency }}</td>
+                            <td>
+                                <span class="badge badge-active">Active</span>
+                            </td>
+                            <td>
+                                <form action="{{ url_for('admin.update_interest') }}" method="POST" style="display: flex; gap: 0.5rem;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="loan_id" value="{{ loan.loan_id }}">
+                                    <input type="number" name="month_no" placeholder="Mo #"
+                                        value="{{ loan.next_payment_month }}"
+                                        style="width: 60px; padding: 0.3rem; border-radius: 4px; border: 1px solid #444; background: #222; color: white;"
+                                        required>
+                                    <input type="number" name="amount" value="{{ loan.next_emi_amount }}"
+                                        placeholder="Amount"
+                                        style="width: 100px; padding: 0.3rem; border-radius: 4px; border: 1px solid #444; background: #222; color: white;"
+                                        required>
+                                    <button type="submit" class="btn btn-sm">Pay</button>
+                                </form>
+                            </td>
+                            <td>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button onclick="togglePaymentHistory({{ loan.loan_id }})" class="btn btn-sm"
+                                        style="background: #3b82f6;">History</button>
+                                    <form action="{{ url_for('admin.delete_loan', loan_id=loan.loan_id) }}" method="POST"
+                                        style="display: inline;"
+                                        onsubmit="return confirm('Are you sure you want to delete this loan and all its payment history? This cannot be undone.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Payment History Row (Hidden by default) -->
+                        <tr id="payment-history-{{ loan.loan_id }}" style="display: none;">
+                            <td colspan="8" style="background: rgba(255,255,255,0.02); padding: 1rem;">
+                                <h4 style="margin-bottom: 0.75rem; color: #60a5fa;">Payment History</h4>
+                                <div id="payment-history-content-{{ loan.loan_id }}">
+                                    Loading...
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: var(--text-muted)">No active loans.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Create Loan Modal -->
+    <div id="createLoanModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+        <div class="card" style="width: 90%; max-width: 500px; margin: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>Create New Loan</h2>
+                <button onclick="hideCreateLoanModal()"
+                    style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">×</button>
+            </div>
+            <form action="{{ url_for('admin.create_loan') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted);">Member</label>
+                    <select name="member_id" required
+                        style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: white;">
+                        <option value="">Select Member</option>
+                        {% for member in all_members %}
+                        <option value="{{ member.member_id }}">{{ member.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted);">Loan Amount
+                        (₹)</label>
+                    <input type="number" name="amount" min="1000" step="100" required
+                        style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: white;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted);">Duration
+                        (Months)</label>
+                    <input type="number" name="months" min="1" max="60" required
+                        style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: white;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted);">Interest Rate
+                        (%/month)</label>
+                    <input type="number" name="interest_rate" min="0" max="10" step="0.1" value="1" required
+                        style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: white;">
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted);">Payment Type</label>
+                    <select name="payment_type" required
+                        style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #444; background: #222; color: white;">
+                        <option value="monthly">Monthly EMI (Principal + Interest each month)</option>
+                        <option value="lump_sum">Full Cash at Deadline (Principal + Total Interest)</option>
+                    </select>
+                    <div
+                        style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                        <strong>Monthly EMI:</strong> Pay reducing balance EMI each month<br>
+                        <strong>Full Cash:</strong> Pay entire amount + interest at the end
+                    </div>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit" class="btn" style="flex: 1;">Create Loan</button>
+                    <button type="button" onclick="hideCreateLoanModal()" class="btn btn-secondary"
+                        style="flex: 1;">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script>
+        function showCreateLoanModal() {
+            document.getElementById('createLoanModal').style.display = 'flex';
+        }
+        function hideCreateLoanModal() {
+            document.getElementById('createLoanModal').style.display = 'none';
+        }
+
+        function togglePaymentHistory(loanId) {
+            const historyRow = document.getElementById('payment-history-' + loanId);
+            const contentDiv = document.getElementById('payment-history-content-' + loanId);
+
+            if (historyRow.style.display === 'none') {
+                historyRow.style.display = 'table-row';
+
+                // Fetch payment history
+                fetch('/admin/loan_payment_history/' + loanId)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.payments && data.payments.length > 0) {
+                            let html = '<table style="width: 100%; border-collapse: collapse;">';
+                            html += '<thead><tr style="background: rgba(255,255,255,0.05);">';
+                            html += '<th style="padding: 0.5rem; text-align: left;">Month #</th>';
+                            html += '<th style="padding: 0.5rem; text-align: left;">Amount</th>';
+                            html += '<th style="padding: 0.5rem; text-align: left;">Paid Date</th>';
+                            html += '<th style="padding: 0.5rem; text-align: left;">Action</th>';
+                            html += '</tr></thead><tbody>';
+
+                            data.payments.forEach(payment => {
+                                html += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">';
+                                html += '<td style="padding: 0.5rem;">Month ' + payment.month_no + '</td>';
+                                html += '<td style="padding: 0.5rem; color: #4ade80; font-weight: 600;">₹' + payment.amount.toFixed(2) + '</td>';
+                                html += '<td style="padding: 0.5rem;">' + payment.paid_date + '</td>';
+                                html += '<td style="padding: 0.5rem;">';
+                                html += '<form action="/admin/undo_payment/' + payment.id + '" method="POST" style="display: inline;" ';
+                                html += 'onsubmit="return confirm(\'Are you sure you want to undo this payment? The loan balance will be recalculated.\');">';
+                                html += '<button type="submit" class="btn btn-sm" style="background: #f59e0b; padding: 0.25rem 0.5rem;">Undo</button>';
+                                html += '</form></td></tr>';
+                            });
+
+                            html += '</tbody></table>';
+                            contentDiv.innerHTML = html;
+                        } else {
+                            contentDiv.innerHTML = '<p style="color: var(--text-muted);">No payment history available.</p>';
+                        }
+                    })
+                    .catch(error => {
+                        contentDiv.innerHTML = '<p style="color: #ef4444;">Error loading payment history.</p>';
+                        console.error('Error:', error);
+                    });
+            } else {
+                historyRow.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+
+</html>
